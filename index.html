@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Velocímetro GPS</title>
+
+<!-- Evitar cache agresivo -->
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #7CFF00; /* verde claro */
+    overflow: hidden;
+  }
+
+  #container {
+    text-align: center;
+  }
+
+  #speed {
+    font-size: 22vw;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  #unit {
+    font-size: 5vw;
+    opacity: 0.6;
+  }
+
+  #status {
+    font-size: 3.5vw;
+    margin-top: 2vh;
+    opacity: 0.4;
+  }
+</style>
+</head>
+<body>
+
+<div id="container">
+  <div id="speed">0</div>
+  <div id="unit">km/h</div>
+  <div id="status">GPS activo</div>
+</div>
+
+<script>
+/* ==========================
+   Wake Lock (pantalla activa)
+   ========================== */
+let wakeLock = null;
+
+async function requestWakeLock() {
+  try {
+    if ("wakeLock" in navigator) {
+      wakeLock = await navigator.wakeLock.request("screen");
+    }
+  } catch (e) {
+    // silencioso: no es crítico
+  }
+}
+
+// Reintentar si se pierde
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    requestWakeLock();
+  }
+});
+
+requestWakeLock();
+
+/* ==========================
+   Velocímetro GPS
+   ========================== */
+
+const speedEl = document.getElementById("speed");
+const statusEl = document.getElementById("status");
+
+let lastSpeed = 0;
+let hasFix = false;
+
+function updateSpeed(rawMs) {
+  const kmh = rawMs * 3.6;
+
+  // Suavizado leve (respuesta rápida pero estable)
+  const smooth = (lastSpeed * 0.6) + (kmh * 0.4);
+  lastSpeed = smooth;
+
+  speedEl.textContent = Math.round(smooth);
+}
+
+if ("geolocation" in navigator) {
+  navigator.geolocation.watchPosition(
+    pos => {
+      const v = pos.coords.speed;
+
+      if (v !== null && v >= 0) {
+        updateSpeed(v);
+        if (!hasFix) {
+          statusEl.textContent = "GPS fijado";
+          hasFix = true;
+        }
+      }
+    },
+    err => {
+      statusEl.textContent = "Error GPS";
+    },
+    {
+      enableHighAccuracy: true,
+      maximumAge: 500,
+      timeout: 5000
+    }
+  );
+} else {
+  statusEl.textContent = "GPS no disponible";
+}
+
+/* ==========================
+   Mantener orientación vertical
+   ========================== */
+if (screen.orientation && screen.orientation.lock) {
+  screen.orientation.lock("portrait").catch(() => {});
+}
+</script>
+
+</body>
+</html>
