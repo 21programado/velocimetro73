@@ -127,16 +127,10 @@ if ("geolocation" in navigator) {
 } else {
   statusEl.textContent = "GPS no disponible";
 }
-
-/* ==========================
-   Bloquear orientación
-   ========================== */
-if (screen.orientation && screen.orientation.lock) {
-  screen.orientation.lock("portrait").catch(() => {});
-}
 </script>
 
 </body>
 </html>
+
 
 
