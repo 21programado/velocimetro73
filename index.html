@@ -5,7 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Velocímetro GPS</title>
 
-<!-- Evitar cache agresivo -->
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+
+<!-- Evitar cache raro -->
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 
@@ -49,10 +53,17 @@
 <div id="container">
   <div id="speed">0</div>
   <div id="unit">km/h</div>
-  <div id="status">GPS activo</div>
+  <div id="status">Buscando GPS…</div>
 </div>
 
 <script>
+/* ==========================
+   Registrar Service Worker
+   ========================== */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+
 /* ==========================
    Wake Lock (pantalla activa)
    ========================== */
@@ -63,12 +74,9 @@ async function requestWakeLock() {
     if ("wakeLock" in navigator) {
       wakeLock = await navigator.wakeLock.request("screen");
     }
-  } catch (e) {
-    // silencioso: no es crítico
-  }
+  } catch (_) {}
 }
 
-// Reintentar si se pierde
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     requestWakeLock();
@@ -80,20 +88,16 @@ requestWakeLock();
 /* ==========================
    Velocímetro GPS
    ========================== */
-
 const speedEl = document.getElementById("speed");
 const statusEl = document.getElementById("status");
 
 let lastSpeed = 0;
 let hasFix = false;
 
-function updateSpeed(rawMs) {
-  const kmh = rawMs * 3.6;
-
-  // Suavizado leve (respuesta rápida pero estable)
+function updateSpeed(ms) {
+  const kmh = ms * 3.6;
   const smooth = (lastSpeed * 0.6) + (kmh * 0.4);
   lastSpeed = smooth;
-
   speedEl.textContent = Math.round(smooth);
 }
 
@@ -101,7 +105,6 @@ if ("geolocation" in navigator) {
   navigator.geolocation.watchPosition(
     pos => {
       const v = pos.coords.speed;
-
       if (v !== null && v >= 0) {
         updateSpeed(v);
         if (!hasFix) {
@@ -110,8 +113,10 @@ if ("geolocation" in navigator) {
         }
       }
     },
-    err => {
-      statusEl.textContent = "Error GPS";
+    () => {
+      if (hasFix) {
+        statusEl.textContent = "Señal GPS débil";
+      }
     },
     {
       enableHighAccuracy: true,
@@ -124,7 +129,7 @@ if ("geolocation" in navigator) {
 }
 
 /* ==========================
-   Mantener orientación vertical
+   Bloquear orientación
    ========================== */
 if (screen.orientation && screen.orientation.lock) {
   screen.orientation.lock("portrait").catch(() => {});
@@ -133,3 +138,5 @@ if (screen.orientation && screen.orientation.lock) {
 
 </body>
 </html>
+
+
